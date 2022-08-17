@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 from ecgdetectors import Detectors
-import hrv
+import bwr
 import matplotlib.pyplot as plt
 
 SAMPLE_RATE = 250
@@ -10,8 +10,7 @@ SAMPLE_RATE = 250
 def openData():
     dataDir = 'Data/ECG.tsv'
     unfiltered_ecg_dat = np.loadtxt(dataDir)
-    unfiltered_ecg_dat = unfiltered_ecg_dat[:, 0]
-    return unfiltered_ecg_dat
+    return unfiltered_ecg_dat[:, 0]
 
 
 def r_peaks(data) -> list[int]:
@@ -44,30 +43,49 @@ def show_r_peaks(data, r_peaks_indice: list[int]):
     plt.show()
 
 
-if __name__ == '__main__':
-    data = openData()
-    expandedData = np.expand_dims(data, axis=0)
-    r_peaks_indice: list[int] = r_peaks(data)
-    show_r_peaks(data, r_peaks_indice)
-
+def show_r_distances(r_peaks_indice: list[int]):
     r_peaks_distance: list[int] = []
     for i in range(1, len(r_peaks_indice)):
         r_peaks_distance.append(r_peaks_indice[i] - r_peaks_indice[i - 1])
-
     length: int = len(r_peaks_distance)
     if length > 1:
         plt.title("R Distance")
         plt.xlabel("R1")
         plt.ylabel("R2")
-        x = np.arange(1, length)
 
         distanceRelationToBase: list[float] = []
-        distIndex: int = 1
-        baseDistance = r_peaks_distance[0]
-
-        for x_element in x:
+        for i in range(1, len(r_peaks_distance)):
             distanceRelationToBase.append(
-                x_element * (r_peaks_distance[distIndex] / baseDistance))
-            distIndex += 1
-        plt.scatter(x, distanceRelationToBase)
+                i * (r_peaks_distance[i] / r_peaks_distance[0]))
+        plt.scatter(np.arange(1, length), distanceRelationToBase)
+        xpoints = ypoints = plt.xlim()
+        plt.plot(xpoints, ypoints, linestyle='--',
+                 color='r', lw=1, scalex=False, scaley=False)
         plt.show()
+
+
+def removeBaseLine(signal):
+    baseline = bwr.calc_baseline(signal)
+
+    # Remove baseline from orgianl signal
+    ecg_out = signal - baseline
+
+    plt.subplot(2, 1, 1)
+    plt.plot(signal, "b-", label="signal")
+    plt.plot(baseline, "r-", label="baseline")
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(ecg_out, "b-", label="signal - baseline")
+    plt.legend()
+    plt.show()
+
+    return ecg_out
+
+
+if __name__ == '__main__':
+    signal = openData()
+    signalMinusBaseLine = removeBaseLine(signal)
+    r_peaks_indice: list[int] = r_peaks(signalMinusBaseLine)
+    show_r_peaks(signalMinusBaseLine, r_peaks_indice)
+    show_r_distances(r_peaks_indice)
